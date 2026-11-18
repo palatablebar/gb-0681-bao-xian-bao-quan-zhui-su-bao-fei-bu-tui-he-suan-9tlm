@@ -20,7 +20,7 @@ def create_app():
     def health():return jsonify(status='ok')
     @app.post('/api/runs')
     def submit():
-        content,params=payload();state=run(content,params);return jsonify(store.save(state['run_id'],state))
+        raw,params,source=payload();state=run(raw,params,7,source);return jsonify(store.save(state['run_id'],state))
     @app.get('/api/runs')
     def list_runs():return jsonify(store.history())
     @app.get('/api/runs/<run_id>')
@@ -33,11 +33,13 @@ def create_app():
     @app.get('/api/archive/<run_id>/export.csv')
     def download(run_id):
         state=store.get(run_id)
+        if state.get('superseded_by'):
+            raise DomainError('SUPERSEDED','源数据已更新，本批次结论失效，请下载新批次',409)
         if not state.get('reconcile',{}).get('balanced'):raise DomainError('UNBALANCED','对账未平')
         return Response(bundle(state),mimetype='text/csv; charset=utf-8',headers={'Content-Disposition':'attachment; filename=evidence.csv'})
     with app.app_context():
         if not store.history():
-            state=run(load('dirty.csv'),{});store.save(state['run_id'],state)
+            state=run(load('dirty.csv'),{},7,'sample:dirty.csv');store.save(state['run_id'],state)
     return app
 
 app=create_app()

@@ -11,7 +11,7 @@
 | M3 保全选版 | 查看并复算保全选版 | `/api/m3_versions` | `app/modules/m3_versions/rules.py` | `tests/test_versions.py` |
 | M4 承保切片 | 查看并复算承保切片 | `/api/m4_segments` | `app/modules/m4_segments/rules.py` | `tests/test_segments.py` |
 | M5 保费重算 | 查看并复算保费重算 | `/api/m5_calculate` | `app/modules/m5_calculate/rules.py` | `tests/test_calculate.py` |
-| M6 补退对账 | 查看并复算补退对账 | `/api/m6_reconcile` | `app/modules/m6_reconcile/compare.py` | `tests/test_reconcile.py` |
+| M6 补退对账 | 查看并复算补退对账 | `/api/m6_reconcile` | `app/modules/m6_reconcile/settle.py` | `tests/test_settlement.py` |
 | M7 结案归档 | 查看并复算结案归档 | `/api/m7_archive` | `app/modules/m7_archive/export_out.py` | `tests/test_archive.py` |
 
 ## 陷阱登记
@@ -31,10 +31,18 @@
 | TRAP-26 | 旧版本复核 | 覆盖新结论 | 事务条件更新 | `app/store.py` | `tests/test_archive.py::test_stale_review` |
 | TRAP-23 | 生效日端点 | 双计生效日 | 半开区间 | `app/modules/m4_segments/rules.py` | `tests/test_segments.py::test_halfopen_conservation` |
 | TRAP-24 | 分币尾差 | 段合计不等 | 最大余额法 | `app/modules/m5_calculate/rules.py` | `tests/test_calculate.py::test_largest_remainder_conserves` |
+| TRAP-27 | 局部放行 | 整批停付或整批误付 | 按保单归属隔离证据定放行/暂缓 | `app/modules/m6_reconcile/settle.py` | `tests/test_settlement.py::test_dirty_partial_release` |
+| TRAP-28 | 真冲突抛错 | 一条矛盾批单中断整批 | 只隔离该保单，其余继续 | `app/modules/m3_versions/rules.py` | `tests/test_settlement.py::test_same_effective_conflict_holds_only_that_policy` |
+| TRAP-29 | 工作台与下载范围不一 | 页面放行、CSV另算 | 同一settlement范围供页面与CSV | `app/modules/m6_reconcile/settle.py` | `tests/test_settlement.py::test_workbench_and_export_share_scope` |
+| TRAP-30 | 晚到源数据 | 旧结论继续可付款 | 同源新批次取代旧批次，原范围转暂缓留档 | `app/store.py` | `tests/test_settlement.py::test_late_source_supersedes_prior_scope` |
 
 ## 对账规则
 
-输入行数=采纳+隔离+空行+重复表头+完全重复；业务总数与计算证据独立求和。隔离行保留来源行、ID、原因码与原值。
+输入行数=采纳+隔离+空行+重复表头+完全重复；业务总数与计算证据独立求和。隔离行保留来源行、ID、原因码与原值。隔离多原因合并到同一行记录，不重复计数。
+
+## 日结放行规则
+
+对账平且保单无隔离证据才放行；有证据的保单暂缓且不划款；对账不平则整批等待。放行范围与结案下载同源，晚到源数据使旧批次失效并重算。
 
 ## 已知不覆盖
 

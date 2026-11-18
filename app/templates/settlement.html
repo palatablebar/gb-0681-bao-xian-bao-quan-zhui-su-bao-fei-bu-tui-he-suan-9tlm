@@ -1,0 +1,26 @@
+{% set s = data.settlement %}
+{% set labels = {'PARTIAL':'局部放行','HOLD_ALL':'整批等待','RELEASE_ALL':'全部放行'} %}
+<section class="panel settlement" id="settlement">
+  <header><h2>日结放行范围</h2><span>{{ labels.get(s.mode, s.mode or '未结算') }}</span></header>
+  {% if s %}
+  <dl>
+    <dt>放行保单</dt><dd>{{ s.released.count }} 份</dd>
+    <dt>暂缓保单</dt><dd>{{ s.held.count }} 份</dd>
+    <dt>放行应收 CNY</dt><dd>{{ s.released.expected }}</dd>
+    <dt>放行实收 CNY</dt><dd>{{ s.released.paid }}</dd>
+    <dt>当日补退 CNY</dt><dd class="amount">{{ s.released.difference }}</dd>
+    <dt>未归属隔离</dt><dd>{{ s.unassigned_isolated }} 笔</dd>
+  </dl>
+  <div class="stamp {{ 'ok' if s.payable else 'hold' }}">{{ '当日可划款' if s.payable else '暂停划款' }}</div>
+  {% if s.superseded %}<div class="notice" role="note">源数据已于 {{ s.superseded.at[:19] }} UTC 更新，本批次结论失效，原放行范围已全部转暂缓；请按新批次重算。</div>{% endif %}
+  <div class="scroll"><table><thead><tr><th>放行保单</th><th>来源行</th><th>应收</th><th>实收</th><th>补退</th><th>结论</th></tr></thead><tbody>
+  {% for r in s.scope.released %}<tr><td>{{ r.policy_id }}</td><td class="num">{{ r.line }}</td><td class="num">{{ r.expected }}</td><td class="num">{{ r.paid }}</td><td class="num amount">{{ r.difference }}</td><td>{{ r.code }}</td></tr>
+  {% else %}<tr><td colspan="6">无放行保单</td></tr>{% endfor %}
+  </tbody></table></div>
+  <div class="scroll"><table><thead><tr><th>暂缓保单</th><th>来源行</th><th>原因</th><th>暂算补退</th></tr></thead><tbody>
+  {% for h in s.scope.held %}<tr><td>{{ h.policy_id }}</td><td class="num">{{ h.source_lines|join(', ') or '—' }}</td><td class="bad" title="{{ h.reasons|join(' / ') }}">{{ h.codes|join(', ') }}</td><td class="num">{{ h.provisional_difference or '—' }}</td></tr>
+  {% else %}<tr><td colspan="4">无暂缓保单</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if s.prior_scope %}<details class="prior"><summary>原放行范围（失效留档）</summary><ul>{% for r in s.prior_scope.released %}<li>{{ r.policy_id }} · {{ r.difference }} · {{ r.code }}</li>{% endfor %}{% for h in s.prior_scope.held %}<li>{{ h.policy_id }} · 暂缓 · {{ h.codes|join(', ') }}</li>{% endfor %}</ul></details>{% endif %}
+  {% else %}<dl><dt>状态</dt><dd>本阶段尚未生成结算范围，请查看补退对账。</dd></dl>{% endif %}
+</section>
